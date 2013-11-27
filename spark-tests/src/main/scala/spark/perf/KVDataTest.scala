@@ -92,6 +92,7 @@ abstract class KVDataTest(sc: SparkContext, dataType: String = "string") extends
       val end = System.currentTimeMillis()
       val time = (end - start).toDouble / 1000.0
       System.gc()
+      sc.dropShuffleBlocks()
       Thread.sleep(interTrialWait * 1000)
       time
     }
