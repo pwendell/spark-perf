@@ -11,7 +11,7 @@ import java.util.Calendar
 import scala.util.Random
 
 
-class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Int, cleanerDelay: Long) extends Logging {
+class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, cleanerDelay: Long) extends Logging {
 
   val MAX_TRIES = 100
   val MAX_KEYS = 1000
@@ -65,7 +65,7 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Int, c
     try {
       for (key <- 1 to MAX_KEYS) {
         if (localFile.exists()) localFile.delete()
-        for (count <- 1 to maxRecordsPerFile) {
+        for (count <- 1L to maxRecordsPerFile) {
           Files.append("word" + key + " ", localFile, Charset.defaultCharset())
           val time = df.format(Calendar.getInstance().getTime())
           val finalFile = new Path(testDir, "file-" + time + "-" + key + "-" + count)

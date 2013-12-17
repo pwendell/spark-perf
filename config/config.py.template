@@ -60,6 +60,19 @@ SHARK_CONF_DIR = SHARK_HOME_DIR + "/conf"
 # to change this to SPARK_CLUSTER_URL = "spark://localhost:7077" for testing.
 SPARK_CLUSTER_URL = open("/root/spark-ec2/cluster-url", 'r').readline().strip()
 
+# This default setting assumes we are running on the Spark EC2 AMI, which has the HDFS_URL 
+# environment variable set. Developers will probably want to change this to 
+# HDFS_URL = "%s/test/" % os.getcwd() 
+HDFS_URL = os.getenv("HDFS_URL")
+if HDFS_URL == None: 
+    raise Exception(
+        '''
+        Environment variable HDFS_URL is not set. 
+        If you are running in a cluster, set HDFS_URL. 
+        If you are running locally, edit the config file to set HDFS_URL = "%s/test/" % os.getcwd()
+        '''
+    )
+
 # Command used to launch Scala.
 SCALA_CMD = "scala"
 
@@ -150,17 +163,6 @@ SHARK_TABLE_STORAGE_OPTS = [
     OptionSet("column-compression-type", ["default"])
 ]
 
-# The following function generates options for setting batch duration in streaming tests
-def STREAMING_BATCH_DURATION_OPTS(duration):
-    return [OptionSet("batch-duration", [duration])]
-
-# The following Java options apply to the streaming tests
-STREAMING_COMMON_JAVA_OPTS = COMMON_JAVA_OPTS + [
-    JavaOptionSet("spark.cleaner.ttl", [1800])
-]
-
-STREAMING_COMMON_OPTS = STREAMING_BATCH_DURATION_OPTS(1000) 
-
 # Test setup
 # --------------------------------------------------------------------------------------------------
 # Set up the actual tests. Each test is represtented by a tuple: (short_name, test_cmd,
@@ -198,24 +200,58 @@ SPARK_TESTS += [("scala-count-w-fltr", "spark.perf.TestRunner count-with-filter"
 # Set up Spark Streaming tests
 STREAMING_TESTS = []
 
-STREAMING_BATCH_DURATION_OPTS = [OptionSet("batch-duration", [1000])]
+# The following function generates options for setting batch duration in streaming tests
+def STREAMING_BATCH_DURATION_OPTS(duration):
+    return [OptionSet("batch-duration", [duration])]
 
-STREAMING_COMMON_OPTS = STREAMING_BATCH_DURATION_OPTS 
+# The following function generates options for setting window duration in streaming tests
+def STREAMING_WINDOW_DURATION_OPTS(duration):
+    return [OptionSet("window-duration", [duration])]
 
-STREAMING_COMMON_JAVA_OPTS = COMMON_JAVA_OPTS
+STREAMING_COMMON_OPTS = [
+    OptionSet("total-duration", [60]),
+    OptionSet("hdfs-url", [HDFS_URL]),
+]
 
-STREAMING_TESTS += [("basic", "streaming.perf.TestRunner basic",
-    SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS, STREAMING_COMMON_OPTS)]
+STREAMING_COMMON_JAVA_OPTS = COMMON_JAVA_OPTS + [
+    JavaOptionSet("spark.cleaner.ttl", [1800])
+    #JavaOptionSet("sun.io.serialization.extendedDebugInfo", ["true"]) ]
+]
 
-HDFS_RECOVERY_TEST_OPTS = STREAMING_BATCH_DURATION_OPTS(5000) + [
-    OptionSet("hdfs-url", ["%s/test/" % os.getcwd()]),
-    OptionSet("total-duration", [3600 * 5]),
+STREAMING_KEY_VAL_TEST_OPTS = STREAMING_COMMON_OPTS + STREAMING_BATCH_DURATION_OPTS(2000) + [
+    # Number of input streams.
+    OptionSet("num-streams", [1], can_scale=True),
+    # Number of records per second per input stream
+    OptionSet("records-per-sec", [10 * 1000]),
+    # Number of reduce tasks.
+    OptionSet("reduce-tasks", [10], can_scale=True),
+    # memory serialization ("true" or "false").
+    OptionSet("memory-serialization", [ "true" ]),
+    # Number of unique keys to sample from.
+    OptionSet("unique-keys",[100 * 1000], True),
+    # Length in characters of each key.
+    OptionSet("unique-values", [1000 * 1000], True),
+]
+
+STREAMING_HDFS_RECOVERY_TEST_OPTS = STREAMING_COMMON_OPTS + STREAMING_BATCH_DURATION_OPTS(5000) + [
     OptionSet("records-per-file", [10000]),
     OptionSet("file-cleaner-delay", [300])
 ]
 
+STREAMING_TESTS += [("basic", "streaming.perf.TestRunner basic",
+    SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS, STREAMING_COMMON_OPTS)] # this test is just to see if everything is setup properly
+
+STREAMING_TESTS += [("state-by-key", "streaming.perf.TestRunner state-by-key",
+    SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS , STREAMING_KEY_VAL_TEST_OPTS)]
+
+STREAMING_TESTS += [("group-by-key-and-window", "streaming.perf.TestRunner group-by-key-and-window",
+    SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS , STREAMING_KEY_VAL_TEST_OPTS + STREAMING_WINDOW_DURATION_OPTS(10000) )]
+
+STREAMING_TESTS += [("reduce-by-key-and-window", "streaming.perf.TestRunner reduce-by-key-and-window",
+    SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS , STREAMING_KEY_VAL_TEST_OPTS + STREAMING_WINDOW_DURATION_OPTS(10000) )]
+
 STREAMING_TESTS += [("hdfs-recovery", "streaming.perf.TestRunner hdfs-recovery",
-    SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS + [ JavaOptionSet("sun.io.serialization.extendedDebugInfo", ["true"]) ], HDFS_RECOVERY_TEST_OPTS)]
+    SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS , STREAMING_HDFS_RECOVERY_TEST_OPTS)]
 
 
 # Set up Shark tests
