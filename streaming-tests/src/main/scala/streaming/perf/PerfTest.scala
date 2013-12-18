@@ -21,7 +21,7 @@ abstract class PerfTest extends Logging {
   var ssc: StreamingContext = _
   var sc: SparkContext = _
 
-  /** Int-type command line options expected for this test */
+  /** Long-type command line options expected for this test */
   def longOptions: Seq[(String, String)] = Seq(BATCH_DURATION, TOTAL_DURATION)
 
   /** String-type command line options expected for this test */
@@ -69,9 +69,12 @@ abstract class PerfTest extends Logging {
       Milliseconds(batchDurationMs), sparkDir, Seq(jarFile))
   }
 
+  /** Get value of long-type command line option */
   def longOptionValue(option: (String, String)) = optionSet.valueOf(option._1).asInstanceOf[Long]
 
+  /** Get value of string-type command line option */
   def stringOptionValue(option: (String, String)) = optionSet.valueOf(option._1).asInstanceOf[String]
 
+  /** Get value of boolean-type ("true" / "false") command line option */
   def booleanOptionValue(option: (String, String)) = optionSet.valueOf(option._1).asInstanceOf[Boolean]
 }
