@@ -6,7 +6,7 @@ version := "0.1"
 
 organization := "org.spark-project"
 
-scalaVersion := "2.9.3"
+scalaVersion := "2.10.3"
 
 libraryDependencies += "org.clapper" % "argot_2.9.2" % "0.4"
 
@@ -24,7 +24,11 @@ libraryDependencies += "org.slf4j" % "slf4j-log4j12" % "1.7.2"
 // to 'perf-tests/spark'.
 unmanagedJars in Compile <++= baseDirectory map  { base =>
   val finder: PathFinder = (file("../spark/assembly/target")) ** "*assembly*hadoop*.jar"
-  finder.get
+  val found = finder.get
+  // spark/assembly/target/ may have multiple jars compiled for multiple versions of scala. 
+  // This checks whether only one of them is being included.
+  if (found.size > 1) throw new Exception("Multiple Spark jars found - " + found.mkString(", ")) 
+  found
 }
 
 assemblySettings

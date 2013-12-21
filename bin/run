@@ -291,9 +291,10 @@ elif has_shark_tests:
     assert os.path.exists(shark_test_jar_path), ("You tried to skip packaging the Shark perf " +
         "tests, but %s was not already present") % shark_test_jar_path
 
-# Sync the whole directory to the slaves.
+# Sync the whole directory to the slaves. 
 print("Syncing the test directory to the slaves.")
-run_cmds_parallel([(make_rsync_cmd(proj_dir, slave), True) for slave in slaves_list])
+if len(slaves_list) > 1 or slaves_list[0] != "localhost" : # no need to sync if running locally
+    run_cmds_parallel([(make_rsync_cmd(proj_dir, slave), True) for slave in slaves_list])
 
 # Start our Spark cluster.
 print("Starting a Spark standalone cluster to use for testing...")
