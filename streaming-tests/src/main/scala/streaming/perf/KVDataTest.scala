@@ -57,7 +57,7 @@ abstract class KVDataTest extends PerfTest {
     outputStream.count.register
 
     val statsReportListener = new StatsReportListener(numBatches)
-    ssc.addListener(statsReportListener)
+    ssc.addStreamingListener(statsReportListener)
     ssc.start()
     Thread.sleep(totalDurationSec * 1000)
     ssc.stop()

@@ -14,7 +14,6 @@ object TestRunner {
     val testClassName = getTestClassName(testName)
     println("Running " + testName + " (class = " + testClassName + ")" +
       " with master = " + master + " and arguments " + perfTestArgs.mkString("[", ",", "]"))
-    val classLoader = Thread.currentThread().getContextClassLoader
     val test = Class.forName(testClassName).newInstance().asInstanceOf[PerfTest]
     test.initialize(testName, master, perfTestArgs)
     val result = test.run()
