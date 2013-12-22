@@ -18,11 +18,17 @@ scale_factor = 0.000001
 # Update or remove this line (unless you actually have 9gb of memory and want to use it):
 JavaOptionSet("spark.executor.memory", ["9g"])',
 
-# Might want to update these:
+# Set these if you want to disable all tests of a particular project
+SPARK_SKIP_TESTS = False
+STREAMING_SKIP_TESTS = False
+SHARK_SKIP_TESTS = False
+
+# Set these if you dont want the script to compile the projects
 SPARK_SKIP_PREP = True
 SHARK_SKIP_PREP = True
 HIVE_SKIP_PREP = True
 
+# Set these if you dont want the script to compile the tests
 SPARK_SKIP_TEST_PREP = True
 STREAMING_SKIP_TEST_PREP = True
 SHARK_SKIP_TEST_PREP = True

@@ -37,23 +37,27 @@ exec("import %s" % os.path.basename(args.config_file).split(".")[0])
 
 # Determine which projects and tests to build based on user-specified tests and boolean flags from
 # the config file.
-# Build Hive and Shark if there are Shark tests specified.
-has_shark_tests = (len(config.SHARK_TESTS) > 0)
-should_prep_shark = has_shark_tests and not config.SHARK_SKIP_PREP
-should_prep_hive = should_prep_shark and not config.HIVE_SKIP_PREP
 
-# Spark will always be built, assuming that any possible test run of this program is going to depend
-# on Spark.
-has_spark_tests = (len(config.SPARK_TESTS) > 0)
-should_prep_spark = not config.SPARK_SKIP_PREP
+# Do each project have tests
+has_spark_tests = (len(config.SPARK_TESTS) > 0) and not config.SPARK_SKIP_TESTS
+has_streaming_tests = (len(config.STREAMING_TESTS) > 0) and not config.STREAMING_SKIP_TESTS
+has_shark_tests = (len(config.SHARK_TESTS) > 0) and not config.SHARK_SKIP_TESTS
 
-# Since Spark is always going to prepared, streaming does not require extra preparation
-has_streaming_tests = (len(config.STREAMING_TESTS) > 0)
+# Should prep each project 
+should_prep_spark = not config.SPARK_SKIP_PREP   # all project depend on Spark, so prepare Spark 
+should_prep_shark = has_shark_tests and not config.SHARK_SKIP_PREP  # prepare Shark if it has tests 
+should_prep_hive = should_prep_shark and not config.HIVE_SKIP_PREP  # prepare Hive if Shark needs to be prepared 
+
+# Need jar for each project's tests. This captures the dependencies between different perf tests 
+# (e.g. Shark tests depends on Spark tests)
+need_spark_tests_jar = has_spark_tests or has_shark_tests # Shark tests require Spark tests jar
+need_streaming_tests_jar = has_streaming_tests
+need_shark_tests_jar = has_shark_tests
 
 # Only build the perf test sources that will be used.
-should_prep_spark_tests = (has_spark_tests or has_shark_tests) and not config.SPARK_SKIP_TEST_PREP
-should_prep_streaming_tests = has_streaming_tests and not config.STREAMING_SKIP_TEST_PREP
-should_prep_shark_tests = has_shark_tests and not config.SHARK_SKIP_TEST_PREP
+should_prep_spark_tests = need_spark_tests_jar and not config.SPARK_SKIP_TEST_PREP
+should_prep_streaming_tests = need_streaming_tests_jar and not config.STREAMING_SKIP_TEST_PREP
+should_prep_shark_tests = need_shark_tests_jar and not config.SHARK_SKIP_TEST_PREP
 
 # Do disk warmup only if there are tests to run.
 should_warmup_disk = (has_shark_tests or has_spark_tests) and not config.SKIP_DISK_WARMUP
@@ -263,33 +267,42 @@ else:
 
 # Build the tests for each project based on copies cloned to the 'proj_dir'.
 spark_work_dir = "%s/spark/work" % proj_dir
+print("Trying to delete spark work dir " + spark_work_dir)
 if os.path.exists(spark_work_dir):
+    println("Actually deleting.")
     # Clear the 'perf-tests/spark/work' directory beforehand, since that may contain scheduler logs
     # from previous jobs. The directory could also contain a spark-perf-tests-assembly.jar that may
     # interfere with subsequent 'sbt assembly' for Spark perf.
     clear_dir(spark_work_dir, ["localhost"])
-
-print("Building perf tests...")
-if should_prep_spark_tests:
-    run_cmd("cd %s/spark-tests; %s clean assembly" % (proj_dir, sbt_cmd))
 else:
-    spark_test_jar_path = "%s/spark-tests/target/spark-perf-tests-assembly.jar" % proj_dir
-    assert os.path.exists(spark_test_jar_path), ("You tried to skip packaging the Spark perf " +
-        "tests, but %s was not already present") % spark_test_jar_path
+    print("Spark work path " + spark_work_dir + " no found.")
 
-if should_prep_streaming_tests:
-    run_cmd("cd %s/streaming-tests; %s clean assembly" % (proj_dir, sbt_cmd))
-elif has_streaming_tests:
-    spark_test_jar_path = "%s/streaming-tests/target/streaming-perf-tests-assembly.jar" % proj_dir
-    assert os.path.exists(spark_test_jar_path), ("You tried to skip packaging the Spark Streaming perf " +
-        "tests, but %s was not already present") % spark_test_jar_path
+if need_spark_tests_jar:
+    print("Building Spark tests...")
+    if should_prep_spark_tests:
+        run_cmd("cd %s/spark-tests; %s clean assembly" % (proj_dir, sbt_cmd))
+    else:
+        spark_test_jar_path = "%s/spark-tests/target/spark-perf-tests-assembly.jar" % proj_dir
+        assert os.path.exists(spark_test_jar_path), ("You tried to skip packaging the Spark perf " +
+            "tests, but %s was not already present") % spark_test_jar_path
 
-if should_prep_shark_tests:
-    run_cmd("cd %s/shark-tests; %s clean assembly" % (proj_dir, sbt_cmd))
-elif has_shark_tests:
-    shark_test_jar_path = "%s/shark-tests/target/shark-perf-tests-assembly.jar" % proj_dir
-    assert os.path.exists(shark_test_jar_path), ("You tried to skip packaging the Shark perf " +
-        "tests, but %s was not already present") % shark_test_jar_path
+if need_streaming_tests_jar:
+    print("Building Spark Streaming tests...")
+    if should_prep_streaming_tests:
+        run_cmd("cd %s/streaming-tests; %s clean assembly" % (proj_dir, sbt_cmd))
+    else:
+        streaming_test_jar_path = "%s/streaming-tests/target/streaming-perf-tests-assembly.jar" % proj_dir
+        assert os.path.exists(streaming_test_jar_path), ("You tried to skip packaging the Spark Streaming perf " +
+            "tests, but %s was not already present") % spark_test_jar_path
+
+if need_shark_tests_jar:
+    print("Building Shark tests...")
+    if should_prep_shark_tests:
+        run_cmd("cd %s/shark-tests; %s clean assembly" % (proj_dir, sbt_cmd))
+    else:
+        shark_test_jar_path = "%s/shark-tests/target/shark-perf-tests-assembly.jar" % proj_dir
+        assert os.path.exists(shark_test_jar_path), ("You tried to skip packaging the Shark perf " +
+            "tests, but %s was not already present") % shark_test_jar_path
 
 # Sync the whole directory to the slaves. 
 print("Syncing the test directory to the slaves.")

@@ -199,7 +199,6 @@ SPARK_TESTS += [("scala-count", "spark.perf.TestRunner count", SCALE_FACTOR, COM
 SPARK_TESTS += [("scala-count-w-fltr", "spark.perf.TestRunner count-with-filter", SCALE_FACTOR,
     COMMON_JAVA_OPTS, SPARK_KV_OPTS)]
 
-
 # Set up Spark Streaming tests
 STREAMING_TESTS = []
 
@@ -228,11 +227,11 @@ STREAMING_KEY_VAL_TEST_OPTS = STREAMING_COMMON_OPTS + streaming_batch_duration_o
     # Number of reduce tasks.
     OptionSet("reduce-tasks", [10], can_scale=True),
     # memory serialization ("true" or "false").
-    OptionSet("memory-serialization", [ "true" ]),
+    OptionSet("memory-serialization", ["true"]),
     # Number of unique keys to sample from.
-    OptionSet("unique-keys",[100 * 1000], True),
+    OptionSet("unique-keys",[100 * 1000], can_scale=True),
     # Length in characters of each key.
-    OptionSet("unique-values", [1000 * 1000], True),
+    OptionSet("unique-values", [1000 * 1000], can_scale=True),
 ]
 
 STREAMING_HDFS_RECOVERY_TEST_OPTS = STREAMING_COMMON_OPTS + streaming_batch_duration_opts(5000) + [
@@ -242,7 +241,7 @@ STREAMING_HDFS_RECOVERY_TEST_OPTS = STREAMING_COMMON_OPTS + streaming_batch_dura
 
 # this test is just to see if everything is setup properly
 STREAMING_TESTS += [("basic", "streaming.perf.TestRunner basic",
-    SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS, STREAMING_COMMON_OPTS + [streaming_batch_duration_opts(1000)])] 
+    SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS, STREAMING_COMMON_OPTS + streaming_batch_duration_opts(1000))] 
 
 STREAMING_TESTS += [("state-by-key", "streaming.perf.TestRunner state-by-key",
     SCALE_FACTOR, STREAMING_COMMON_JAVA_OPTS, STREAMING_KEY_VAL_TEST_OPTS)]
@@ -263,6 +262,7 @@ SHARK_TABLE_OPTS = COMMON_OPTS + SHARK_TABLE_GEN_OPTS + SHARK_TABLE_STORAGE_OPTS
 SHARK_TESTS = []
 
 SHARK_TABLE_SCAN_OPTS = SHARK_TABLE_OPTS + SHARK_TABLE_SCAN_OPTS
+
 SHARK_TESTS += [("table-scan-query", "shark.perf.TestRunner table-scan-query", SCALE_FACTOR,
     COMMON_JAVA_OPTS, SHARK_TABLE_OPTS)]
 
@@ -285,6 +285,11 @@ SHARK_TESTS += [("UDF-query", "shark.perf.TestRunner udf-query", SCALE_FACTOR, C
 # Advanced Configuration Options
 # --------------------------------------------------------------------------------------------------
 
+# Skip all tests of a particular project.
+SPARK_SKIP_TESTS = False 
+STREAMING_SKIP_TESTS = False
+SHARK_SKIP_TESTS = False
+
 # Skip downloading and building Spark, Hive and/or Shark components. Requires project to be already
 # built in its respective directory.
 SPARK_SKIP_PREP = False
@@ -294,7 +299,7 @@ HIVE_SKIP_PREP = False
 # Skip building and packaging project tests (requires respective perf tests to already be packaged
 # in the project's target directory).
 SPARK_SKIP_TEST_PREP = False
-STREAMING_SKIP_TEST_PREP = False 
+STREAMING_SKIP_TEST_PREP = False
 SHARK_SKIP_TEST_PREP = False
 
 # Skip warming up local disks.
