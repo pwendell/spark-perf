@@ -267,15 +267,12 @@ else:
 
 # Build the tests for each project based on copies cloned to the 'proj_dir'.
 spark_work_dir = "%s/spark/work" % proj_dir
-print("Trying to delete spark work dir " + spark_work_dir)
 if os.path.exists(spark_work_dir):
-    println("Actually deleting.")
     # Clear the 'perf-tests/spark/work' directory beforehand, since that may contain scheduler logs
     # from previous jobs. The directory could also contain a spark-perf-tests-assembly.jar that may
     # interfere with subsequent 'sbt assembly' for Spark perf.
+    print("Deleting local spark work dir " + spark_work_dir)
     clear_dir(spark_work_dir, ["localhost"])
-else:
-    print("Spark work path " + spark_work_dir + " no found.")
 
 if need_spark_tests_jar:
     print("Building Spark tests...")
