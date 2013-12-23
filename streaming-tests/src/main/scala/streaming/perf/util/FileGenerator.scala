@@ -145,7 +145,6 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
     var wordMatch = true
     line = br.readLine()
     while (line != null) {
-      println("Read line: [" + line + "]")
       val words = line.split(" ").filter(_.size != 0)
       wordMatch = wordMatch && words.forall(_ == expectedWord)
       count += words.size
