@@ -9,6 +9,7 @@ import java.text.SimpleDateFormat
 import java.nio.charset.Charset
 import java.util.Calendar
 import scala.util.Random
+import java.io.{BufferedReader, FileReader}
 
 
 class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, cleanerDelay: Long) extends Logging {
@@ -64,7 +65,10 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
       for (key <- 1 to MAX_KEYS) {
         if (localFile.exists()) localFile.delete()
         for (count <- 1L to maxRecordsPerFile) {
-          Files.append("word" + key + " ", localFile, Charset.defaultCharset())
+          val word = "word" + key
+          val newLine = if (count % 10 == 0) "\n" else ""
+          Files.append(word + " " + newLine, localFile, Charset.defaultCharset())
+          verifyLocalFile(word, count)
           val time = df.format(Calendar.getInstance().getTime())
           val finalFile = new Path(testDir, "file-" + time + "-" + key + "-" + count)
           val generated = copyFile(localFile, finalFile)
@@ -132,6 +136,24 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
           reset()
       }
     }
+  }
+
+  private def verifyLocalFile(expectedWord: String, expectedCount: Long) {
+    val br = new BufferedReader(new FileReader(localFile))
+    var line = ""
+    var count = 0L
+    var wordMatch = true
+    line = br.readLine()
+    while (line != null) {
+      println("Read line: [" + line + "]")
+      val words = line.split(" ").filter(_.size != 0)
+      wordMatch = wordMatch && words.forall(_ == expectedWord)
+      count += words.size
+      line = br.readLine()
+    }
+    br.close()
+    logInfo("Local file has " + count + " occurrences of " + expectedWord +
+      (if (count != expectedCount)  ", expected was " + expectedCount else ""))
   }
 
   private def fs: FileSystem = synchronized {
