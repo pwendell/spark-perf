@@ -1,7 +1,7 @@
 package streaming.perf.util
 
 import org.apache.spark.{Logging, SparkContext}
-import org.apache.hadoop.fs.{PathFilter, Path}
+import org.apache.hadoop.fs.{PathFilter, Path, FileSystem}
 import org.apache.hadoop.conf.Configuration
 import com.google.common.io.Files
 import java.io.{IOException, File}
@@ -26,7 +26,7 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
   val localFile = new File(localTestDir, "temp")
   val df = new SimpleDateFormat("MM-dd-HH-mm-ss-SSS")
 
-  var fs = testDirectory.getFileSystem(conf)
+  var fs_ : FileSystem = null
 
   def initialize() {
     if (fs.exists(testDirectory)) {
@@ -48,7 +48,6 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
     deletingThread.interrupt()
     generatingThread.join()
     logInfo("Interrupted")
-    fs.close()
   }
 
   /** Delete test directory */
@@ -99,8 +98,8 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
         done = true
       } catch {
         case ioe: IOException =>
-          fs = testDirectory.getFileSystem(conf)
           logWarning("Attempt " + tries + " at generating file " + finalFile + " failed.", ioe)
+          reset()
       }
     }
     done
@@ -131,7 +130,17 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
           logInfo("File deleting thread interrupted")
         case e: Exception =>
           logWarning("Deleting files gave error ", e)
+          reset()
       }
     }
+  }
+
+  private def fs: FileSystem = synchronized {
+    if (fs_ == null) fs_ = testDirectory.getFileSystem(new Configuration())
+    fs_
+  }
+
+  private def reset() {
+    fs_ = null
   }
 }
