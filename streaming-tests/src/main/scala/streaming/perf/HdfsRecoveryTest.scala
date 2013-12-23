@@ -40,12 +40,8 @@ class HdfsRecoveryTest extends PerfTest {
     runningCountStream.foreach((rdd: RDD[(String, Long)], time: Time) => {
       val counts = rdd.collect()
       val possibleCounts = expectedCounts
-      println("Running counts at " + time + " = " + counts.mkString("[", ", ", "]"))
       val expected = counts.forall { case (word, count) => possibleCounts.contains(count) }
-      if (!expected) {
-        println("Running count at " + time + " did not match")
-        System.exit(0)
-      }
+      println("Running counts at " + time + " = " + counts.mkString("[", ", ", "]") + (if (!expected) ", no match" else ""))
     })
 
     // Run the computation
