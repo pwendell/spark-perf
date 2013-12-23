@@ -46,7 +46,6 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
   def stop() {
     generatingThread.interrupt()
     deletingThread.interrupt()
-    generatingThread.join()
     logInfo("Interrupted")
   }
 
