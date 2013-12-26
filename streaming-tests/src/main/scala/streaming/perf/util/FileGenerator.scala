@@ -16,29 +16,36 @@ class FileGenerator(sc: SparkContext, dataDir: String, tempDataDir: String, maxR
 
   val MAX_TRIES = 100
   val MAX_KEYS = 1000
-  val INTERVAL = 100
+  val INTERVAL = 50
+  val VERIFY_LOCAL_FILES = false
 
-  val testDirectory = new Path(dataDir)
+  val dataDirectory = new Path(dataDir)
+  val tempDataDirectory = new Path(tempDataDir)
+  val localFile = new File(Files.createTempDir(), "temp")
+  val tempFile = new Path(tempDataDirectory, "temp-file")
   val conf = new Configuration()
-  val initFile = new Path(testDirectory, "test")
+  // val initFile = new Path(dataDirectory, "test")
   val generatingThread = new Thread() { override def run() { generateFiles() }}
   val deletingThread = new Thread() { override def run() { deleteOldFiles() }}
-  val localTestDir = Files.createTempDir()
-  val localFile = new File(localTestDir, "temp")
-  val tempFile = new Path(tempDataDir, "temp-file")
   val df = new SimpleDateFormat("MM-dd-HH-mm-ss-SSS")
 
   var fs_ : FileSystem = null
 
   def initialize() {
-    if (fs.exists(testDirectory)) {
-      fs.delete(testDirectory, true)
-      fs.mkdirs(testDirectory)
+    if (fs.exists(dataDirectory)) {
+      fs.delete(dataDirectory, true)
     }
+    fs.mkdirs(dataDirectory)
+    if (fs.exists(tempDataDirectory)) {
+      fs.delete(tempDataDirectory, true)
+    }
+    fs.mkdirs(tempDataDirectory)
   }
 
   /** Start generating files */
   def start() {
+    generatingThread.setDaemon(true)
+    deletingThread.setDaemon(true)
     generatingThread.start()
     deletingThread.start()
     logInfo("Started")
@@ -53,7 +60,7 @@ class FileGenerator(sc: SparkContext, dataDir: String, tempDataDir: String, maxR
 
   /** Delete test directory */
   def cleanup() {
-    fs.delete(testDirectory, true)
+    fs.delete(dataDirectory, true)
   }
 
   /**
@@ -69,7 +76,7 @@ class FileGenerator(sc: SparkContext, dataDir: String, tempDataDir: String, maxR
           val word = "word" + key
           val newLine = if (count % 10 == 0) "\n" else ""
           Files.append(word + " " + newLine, localFile, Charset.defaultCharset())
-          verifyLocalFile(word, count)
+          if (VERIFY_LOCAL_FILES) verifyLocalFile(word, count)
           val time = df.format(Calendar.getInstance().getTime())
           val finalFile = new Path(dataDir, "file-" + time + "-" + key + "-" + count)
           val generated = copyFile(localFile, finalFile)
@@ -98,15 +105,18 @@ class FileGenerator(sc: SparkContext, dataDir: String, tempDataDir: String, maxR
     while (!done && tries < MAX_TRIES) {
       tries += 1
       try {
+        logInfo("Copying from " + localFile + " to " + tempFile)
         fs.copyFromLocalFile(new Path(localFile.toString), tempFile)
-        fs.rename(tempFile, finalFile)
+        if (fs.exists(tempFile)) logInfo("" + tempFile + " exists") else logInfo("" + tempFile + " does not exist")
+        logInfo("Renaming from " + tempFile + " to " + finalFile)
+        if (!fs.rename(tempFile, finalFile)) throw new Exception("Could not rename " + tempFile + " to " + finalFile)
         done = true
       } catch {
         case ioe: IOException =>
           logWarning("Attempt " + tries + " at generating file " + finalFile + " failed.", ioe)
           reset()
       } finally {
-        if (fs.exists(tempFile)) fs.delete(tempFile, true)
+        // if (fs.exists(tempFile)) fs.delete(tempFile, true)
       }
     }
     done
@@ -126,7 +136,7 @@ class FileGenerator(sc: SparkContext, dataDir: String, tempDataDir: String, maxR
           }
         }
         logInfo("Finding files older than " + (System.currentTimeMillis() - cleanerDelay * 1000))
-        val oldFiles = fs.listStatus(testDirectory, newFilter).map(_.getPath)
+        val oldFiles = fs.listStatus(dataDirectory, newFilter).map(_.getPath)
         oldFiles.foreach(file => {
           logInfo("Deleting file " + file)
           fs.delete(file, true)
@@ -160,7 +170,7 @@ class FileGenerator(sc: SparkContext, dataDir: String, tempDataDir: String, maxR
   }
 
   private def fs: FileSystem = synchronized {
-    if (fs_ == null) fs_ = testDirectory.getFileSystem(new Configuration())
+    if (fs_ == null) fs_ = dataDirectory.getFileSystem(new Configuration())
     fs_
   }
 
