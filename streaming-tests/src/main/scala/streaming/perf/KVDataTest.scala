@@ -98,7 +98,7 @@ object KVDataTest {
     val statCounter = distrib.statCounter
     val quantiles = Array(0,0.25,0.5,0.75,1.0)
     val quantileValues = quantiles.zip(distrib.getQuantiles(quantiles)).toMap
-    val resultString = "count: %d, avg: %.3f ms, stdev: %.3f ms, min: %.3f ms, 25%%: %.3f ms, 50%%: %.3f ms, 75%%: %.3f ms, max: %.3f ms".format(
+    val resultString = "count: %d, avg: %.3f s, stdev: %.3f s, min: %.3f s, 25%%: %.3f s, 50%%: %.3f s, 75%%: %.3f s, max: %.3f s".format(
       processingDelays.size, statCounter.mean, statCounter.stdev, quantileValues(0), quantileValues(0.25), quantileValues(0.5),
       quantileValues(0.75), quantileValues(1.0)
     )
