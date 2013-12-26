@@ -12,19 +12,20 @@ import scala.util.Random
 import java.io.{BufferedReader, FileReader}
 
 
-class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, cleanerDelay: Long) extends Logging {
+class FileGenerator(sc: SparkContext, dataDir: String, tempDataDir: String, maxRecordsPerFile: Long, cleanerDelay: Long) extends Logging {
 
   val MAX_TRIES = 100
   val MAX_KEYS = 1000
   val INTERVAL = 100
 
-  val testDirectory = new Path(testDir)
+  val testDirectory = new Path(dataDir)
   val conf = new Configuration()
   val initFile = new Path(testDirectory, "test")
   val generatingThread = new Thread() { override def run() { generateFiles() }}
   val deletingThread = new Thread() { override def run() { deleteOldFiles() }}
   val localTestDir = Files.createTempDir()
   val localFile = new File(localTestDir, "temp")
+  val tempFile = new Path(tempDataDir, "temp-file")
   val df = new SimpleDateFormat("MM-dd-HH-mm-ss-SSS")
 
   var fs_ : FileSystem = null
@@ -70,7 +71,7 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
           Files.append(word + " " + newLine, localFile, Charset.defaultCharset())
           verifyLocalFile(word, count)
           val time = df.format(Calendar.getInstance().getTime())
-          val finalFile = new Path(testDir, "file-" + time + "-" + key + "-" + count)
+          val finalFile = new Path(dataDir, "file-" + time + "-" + key + "-" + count)
           val generated = copyFile(localFile, finalFile)
           if (generated) {
             logInfo("Generated file #" + count + " at " + System.currentTimeMillis() + ": " + finalFile)
@@ -97,12 +98,15 @@ class FileGenerator(sc: SparkContext, testDir: String, maxRecordsPerFile: Long, 
     while (!done && tries < MAX_TRIES) {
       tries += 1
       try {
-        fs.copyFromLocalFile(new Path(localFile.toString), finalFile)
+        fs.copyFromLocalFile(new Path(localFile.toString), tempFile)
+        fs.rename(tempFile, finalFile)
         done = true
       } catch {
         case ioe: IOException =>
           logWarning("Attempt " + tries + " at generating file " + finalFile + " failed.", ioe)
           reset()
+      } finally {
+        if (fs.exists(tempFile)) fs.delete(tempFile, true)
       }
     }
     done
