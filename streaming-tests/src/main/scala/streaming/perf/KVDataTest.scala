@@ -1,6 +1,7 @@
 package streaming.perf
 
 import org.apache.spark.util.Distribution
+import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Milliseconds, StreamingContext, DStream, Time}
 import org.apache.spark.streaming.scheduler.StatsReportListener
 import StreamingContext._
@@ -10,6 +11,8 @@ import org.apache.spark.storage.StorageLevel
 
 abstract class KVDataTest extends PerfTest {
 
+  import KVDataTest._
+
   val NUM_STREAMS =      ("num-streams", "number of input streams")
   val RECORDS_PER_SEC =  ("records-per-sec", "number of records generated per second")
   val REDUCE_TASKS =     ("reduce-tasks",  "number of reduce tasks")
@@ -18,7 +21,6 @@ abstract class KVDataTest extends PerfTest {
   val MEMORY_SERIALIZATION = ("memory-serialization", "whether memory-persisted data is serialized")
   //val KEY_LENGTH =       ("key-length",    "length of keys in characters")
   //val VALUE_LENGTH =     ("value-length",  "length of values in characters")
-  val IGNORED_BATCHES = 10
 
   var numStreams: Int = _
   var recordsPerSec: Long = _
@@ -51,14 +53,23 @@ abstract class KVDataTest extends PerfTest {
       "# batches (" + numBatches + ") to run not more than # ignored batches (" + IGNORED_BATCHES + "). " +
         "Increase total-duration config."
     )
-
+    
+    // setup listener
+    @transient val statsReportListener = new StatsReportListener(numBatches)
+    ssc.addStreamingListener(statsReportListener)
+    
+    // setup streams
     val unifiedInputStream = setupInputStreams(numStreams)
     val outputStream = setupOutputStream(unifiedInputStream)
     outputStream.count.register
+    outputStream.foreach((rdd: RDD[_], time: Time) => {
+      // @transient val reporter = statsReportListener
+      // if (time.milliseconds % 2000 == 0) println("Stats at " + time + ": " + processResults(reporter))
+    })
 
-    val statsReportListener = new StatsReportListener(numBatches)
-    ssc.addStreamingListener(statsReportListener)
+    // run test
     ssc.start()
+    val startTime = System.currentTimeMillis
     Thread.sleep(totalDurationSec * 1000)
     ssc.stop()
     processResults(statsReportListener)
@@ -75,7 +86,11 @@ abstract class KVDataTest extends PerfTest {
 
   // Setup the streaming computations
   def setupOutputStream(inputStream: DStream[(String, String)]): DStream[_]
+}
 
+object KVDataTest {
+  val IGNORED_BATCHES = 10
+ 
   // Generate statistics from the processing data
   def processResults(statsReportListener: StatsReportListener): String = {
     val processingDelays = statsReportListener.batchInfos.flatMap(_.processingDelay).map(_.toDouble / 1000.0)
@@ -118,7 +133,7 @@ class ReduceByKeyAndWindowTest extends WindowKVDataTest {
   // Setup the streaming computations
   def setupOutputStream(inputStream: DStream[(String, String)]): DStream[_] = {
     inputStream.reduceByKeyAndWindow((x: String, y: String) => x + y,
-      Milliseconds(windowDurationMs), Milliseconds(batchDurationMs), reduceTasks).persist(storageLevel)
+      Milliseconds(windowDurationMs), Milliseconds(batchDurationMs), reduceTasks)
   }
 }
 
@@ -126,6 +141,5 @@ class GroupByKeyAndWindowTest extends WindowKVDataTest {
   // Setup the streaming computations
   def setupOutputStream(inputStream: DStream[(String, String)]): DStream[_] = {
     inputStream.groupByKeyAndWindow(Milliseconds(windowDurationMs), Milliseconds(batchDurationMs), reduceTasks)
-      .persist(storageLevel)
   }
 }
